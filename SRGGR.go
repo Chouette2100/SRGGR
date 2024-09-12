@@ -30,10 +30,11 @@ import (
 /*
 
 00AA00	新規作成
+00AB00	新規作成（機能再検討、バグ修正）
 
 */
 
-const Version = "00AA00"
+const Version = "00AB00"
 
 // ユーザーギフトランキングを取得しデータベースに格納する
 //
@@ -129,6 +130,15 @@ func main() {
 	// log.SetOutput(logfile)
 	log.SetOutput(io.MultiWriter(logfile, os.Stdout))
 
+	fileenv := "Env.yml"
+	err = exsrapi.LoadConfig(fileenv, &srdblib.Env)
+	if err != nil {
+			err = fmt.Errorf("exsrapi.Loadconfig(): %w", err)
+			log.Printf("%s\n", err.Error())
+			return
+	}
+
+
 	flag.Parse()
 
 	log.Printf("param -giftid: %s -limit: %d\n", *giftid, *limit)
@@ -154,8 +164,10 @@ func main() {
 	srdblib.Dbmap = &gorp.DbMap{Db: srdblib.Db, Dialect: dial, ExpandSliceArgs: true}
 
 	srdblib.Dbmap.AddTableWithName(srdblib.User{}, "user").SetKeys(false, "Userno")
+	srdblib.Dbmap.AddTableWithName(srdblib.Userhistory{}, "userhistory").SetKeys(false, "Userno", "Ts")
 	srdblib.Dbmap.AddTableWithName(srdblib.GiftScore{}, "giftscore").SetKeys(false, "Giftid", "Ts", "Userno")
 	srdblib.Dbmap.AddTableWithName(srdblib.Viewer{}, "viewer").SetKeys(false, "Viewerid")
+	srdblib.Dbmap.AddTableWithName(srdblib.ViewerHistory{}, "viewerhistory").SetKeys(false, "Viewerid", "Ts")
 	srdblib.Dbmap.AddTableWithName(srdblib.ViewerGiftScore{}, "viewergiftscore").SetKeys(false, "Giftid", "Ts", "Viewerid")
 
 	//      cookiejarがセットされたHTTPクライアントを作る
