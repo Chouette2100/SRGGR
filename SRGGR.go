@@ -31,10 +31,11 @@ import (
 
 00AA00	新規作成
 00AB00	新規作成（機能再検討、バグ修正）
+00AC00	GetGiftScoreCntrb()をあらたに作成する（ギフトランキング貢献ランキングデータの保存）
 
 */
 
-const Version = "00AB00"
+const Version = "00AC00"
 
 // ユーザーギフトランキングを取得しデータベースに格納する
 //
@@ -118,7 +119,7 @@ func main() {
 		//      |504|アーティスト|〃|
 		//      |206|ユーザーギフトランキング|GetViewerGiftScore()|
 		giftid = flag.String("giftid", "", "string flag")
-		limit = flag.Int("limit", 500, "int flag")
+		limit  = flag.Int("limit", 500, "int flag")
 	)
 
 	//	ログ出力を設定する
@@ -133,11 +134,10 @@ func main() {
 	fileenv := "Env.yml"
 	err = exsrapi.LoadConfig(fileenv, &srdblib.Env)
 	if err != nil {
-			err = fmt.Errorf("exsrapi.Loadconfig(): %w", err)
-			log.Printf("%s\n", err.Error())
-			return
+		err = fmt.Errorf("exsrapi.Loadconfig(): %w", err)
+		log.Printf("%s\n", err.Error())
+		return
 	}
-
 
 	flag.Parse()
 
@@ -169,6 +169,7 @@ func main() {
 	srdblib.Dbmap.AddTableWithName(srdblib.Viewer{}, "viewer").SetKeys(false, "Viewerid")
 	srdblib.Dbmap.AddTableWithName(srdblib.ViewerHistory{}, "viewerhistory").SetKeys(false, "Viewerid", "Ts")
 	srdblib.Dbmap.AddTableWithName(srdblib.ViewerGiftScore{}, "viewergiftscore").SetKeys(false, "Giftid", "Ts", "Viewerid")
+	srdblib.Dbmap.AddTableWithName(srdblib.GiftScoreCntrb{}, "giftscorecntrb").SetKeys(false, "Giftid", "Ts", "Userno", "Viewerid")
 
 	//      cookiejarがセットされたHTTPクライアントを作る
 	client, jar, err := exsrapi.CreateNewClient("anonymous")
@@ -193,7 +194,27 @@ func main() {
 			continue
 		}
 		tnow := time.Now().Truncate(time.Second)
-		if gid == 206 {
+		if gid == -1 {
+			if len(cgida) != 3 {
+				log.Printf("len(cgida) != 3\n")
+				return
+			}
+			t1, err := strconv.Atoi(cgida[1])
+			if err != nil {
+				log.Printf("t1 = strconv(): %s\n", err.Error())
+				return
+			}
+			t2, err := strconv.Atoi(cgida[2])
+			if err != nil {
+				log.Printf("t2 = strconv(): %s\n", err.Error())
+				return
+			}
+			err = GetGiftScoreCntrb(client, srdblib.Dbmap, tnow, t1, t2)
+			if err != nil {
+				log.Printf("%s\n", err.Error())
+			}
+			break
+		} else if gid == 206 {
 			err = GetViewerGiftScore(client, srdblib.Dbmap, tnow, *limit)
 			if err != nil {
 				log.Printf("%s\n", err.Error())
