@@ -32,10 +32,11 @@ import (
 00AA00	新規作成
 00AB00	新規作成（機能再検討、バグ修正）
 00AC00	GetGiftScoreCntrb()をあらたに作成する（ギフトランキング貢献ランキングデータの保存）
+00AD00	「修羅の道ランキング」(Giftid=13）に対応する
 
 */
 
-const Version = "00AC00"
+const Version = "00AD00"
 
 // ユーザーギフトランキングを取得しデータベースに格納する
 //
@@ -69,10 +70,15 @@ func GetViewerGiftScore(client *http.Client, dbmap *gorp.DbMap, tnow time.Time, 
 // 指定されたギフトコードのギフトランキングを取得しデータベースに格納する
 func GetGiftScore(client *http.Client, dbmap *gorp.DbMap, tnow time.Time, giftid int, limit int) (err error) {
 
-	cgr, err := srapi.ApiCdnGiftRanking(client, giftid, limit)
+	cgr := new(srapi.CdnGiftRanking)
+	if giftid == 13 {
+		cgr, err = srapi.ApiCdnSeasonAwardRanking(client, giftid, limit)
+	} else {
+		cgr, err = srapi.ApiCdnGiftRanking(client, giftid, limit)
+	}
 	if err != nil {
 		err = fmt.Errorf("srapi.ApiCdnGiftRanking() returned error. %w", err)
-		return err
+		return
 	}
 
 	l := len(cgr.RankingList)
@@ -87,7 +93,7 @@ func GetGiftScore(client *http.Client, dbmap *gorp.DbMap, tnow time.Time, giftid
 		)
 		if err != nil {
 			err = fmt.Errorf("srdblib.InserIntoGiftScore() returned error. %w", err)
-			return err
+			return
 		}
 	}
 	return nil
