@@ -33,10 +33,11 @@ import (
 00AB00	新規作成（機能再検討、バグ修正）
 00AC00	GetGiftScoreCntrb()をあらたに作成する（ギフトランキング貢献ランキングデータの保存）
 00AD00	「修羅の道ランキング」(Giftid=13）に対応する
+00AE00	貢献ランキング取得の指定を"giftid=-1"での一括指定から、"giftid=-491,-492"の形式にする
 
 */
 
-const Version = "00AD00"
+const Version = "00AE00"
 
 // ユーザーギフトランキングを取得しデータベースに格納する
 //
@@ -110,20 +111,32 @@ func main() {
 	var (
 		//      |コード|名称|補足|
 		//      |---|---|---|
-		//      |486|人気ライバーランキング|GetGiftScore()|
-		//      |490|新人スタートダッシュ|〃|
-		//      |494|アイドル|〃|
-		//      |495|俳優|〃|
-		//      |496|アナウンサー|〃|
-		//      |497|グローバル|〃|
-		//      |498|声優|〃|
-		//      |499|芸人|〃|
-		//      |500|タレント|〃|
-		//      |501|ライバー|〃|
-		//      |502|モデル|〃|
-		//      |503|バーチャル|〃|
-		//      |504|アーティスト|〃|
+		//      | 13|修羅の道ランキング|GetGiftScore()|
 		//      |206|ユーザーギフトランキング|GetViewerGiftScore()|
+		//      |486|人気ライバーランキング【予選】|GetGiftScore()|
+		//      |490|新人スタートダッシュ|〃|
+		//      |491|人気ライバーランキング【決勝Sリーグ】|〃|
+		//      |492|人気ライバーランキング【決勝Rリーグ】|〃|
+		//      |493|人気ライバーランキング【決勝S・Rリーグ総合】|〃|
+		//      |494|人気ジャンルライバーランキング・アイドル|〃|
+		//      |495|人気ジャンルライバーランキング・俳優|〃|
+		//      |496|人気ジャンルライバーランキング・アナウンサー|〃|
+		//      |497|人気ジャンルライバーランキング・グローバル|〃|
+		//      |498|人気ジャンルライバーランキング・声優|〃|
+		//      |499|人気ジャンルライバーランキング・芸人|〃|
+		//      |500|人気ジャンルライバーランキング・タレント|〃|
+		//      |501|人気ジャンルライバーランキング・ライバー|〃|
+		//      |502|人気ジャンルライバーランキング・モデル|〃|
+		//      |503|人気ジャンルライバーランキング・バーチャル|〃|
+		//      |504|人気ジャンルライバーランキング・アーティスト|〃|
+		//      |505|ふぁぼきゅんランキング|〃|
+		//      |512|Sリーグ期間限定ランキング【9/22】|〃|
+		//      |513|Sリーグ期間限定ランキング【9/25】|〃|
+		//      |514|Sリーグ期間限定ランキング【9/28】|〃|
+		//      |515|Rリーグ期間限定ランキング【9/22】|〃|
+		//      |516|Rリーグ期間限定ランキング【9/25】|〃|
+		//      |517|Rリーグ期間限定ランキング【9/28】|〃|
+		campaignid = flag.String("campaignid", "", "string flag")
 		giftid = flag.String("giftid", "", "string flag")
 		limit  = flag.Int("limit", 500, "int flag")
 	)
@@ -147,7 +160,7 @@ func main() {
 
 	flag.Parse()
 
-	log.Printf("param -giftid: %s -limit: %d\n", *giftid, *limit)
+	log.Printf("param -campaignid: %s -giftid: %s -limit: %d\n", *campaignid, *giftid, *limit)
 
 	//	データベースとの接続をオープンする。
 	var dbconfig *srdblib.DBConfig
@@ -174,6 +187,7 @@ func main() {
 	srdblib.Dbmap.AddTableWithName(srdblib.GiftScore{}, "giftscore").SetKeys(false, "Giftid", "Ts", "Userno")
 	srdblib.Dbmap.AddTableWithName(srdblib.Viewer{}, "viewer").SetKeys(false, "Viewerid")
 	srdblib.Dbmap.AddTableWithName(srdblib.ViewerHistory{}, "viewerhistory").SetKeys(false, "Viewerid", "Ts")
+	srdblib.Dbmap.AddTableWithName(srdblib.GiftRanking{}, "giftranking").SetKeys(false, "Campaignid","Grid")
 	srdblib.Dbmap.AddTableWithName(srdblib.ViewerGiftScore{}, "viewergiftscore").SetKeys(false, "Giftid", "Ts", "Viewerid")
 	srdblib.Dbmap.AddTableWithName(srdblib.GiftScoreCntrb{}, "giftscorecntrb").SetKeys(false, "Giftid", "Ts", "Userno", "Viewerid")
 
@@ -186,6 +200,11 @@ func main() {
 	}
 	//      すべての処理が終了したらcookiejarを保存する。
 	defer jar.Save() //	忘れずに！
+
+	if *campaignid == "" {
+		log.Printf("campaignid is empty\n")
+		return
+	}
 
 	if *giftid == "" {
 		log.Printf("giftid is empty\n")
@@ -200,26 +219,12 @@ func main() {
 			continue
 		}
 		tnow := time.Now().Truncate(time.Second)
-		if gid == -1 {
-			if len(cgida) != 3 {
-				log.Printf("len(cgida) != 3\n")
-				return
-			}
-			t1, err := strconv.Atoi(cgida[1])
-			if err != nil {
-				log.Printf("t1 = strconv(): %s\n", err.Error())
-				return
-			}
-			t2, err := strconv.Atoi(cgida[2])
-			if err != nil {
-				log.Printf("t2 = strconv(): %s\n", err.Error())
-				return
-			}
-			err = GetGiftScoreCntrb(client, srdblib.Dbmap, tnow, t1, t2)
+		if gid < 0 {
+			err = GetGiftScoreCntrb(client, srdblib.Dbmap, tnow, *campaignid, -gid)
 			if err != nil {
 				log.Printf("%s\n", err.Error())
 			}
-			break
+			continue
 		} else if gid == 206 {
 			err = GetViewerGiftScore(client, srdblib.Dbmap, tnow, *limit)
 			if err != nil {
