@@ -34,10 +34,11 @@ import (
 00AC00	GetGiftScoreCntrb()をあらたに作成する（ギフトランキング貢献ランキングデータの保存）
 00AD00	「修羅の道ランキング」(Giftid=13）に対応する
 00AE00	貢献ランキング取得の指定を"giftid=-1"での一括指定から、"giftid=-491,-492"の形式にする
+00AF00	ApiCdnGiftRankingContribution()のエラーでは処理を打ち切らない。V2.0.0環境で再ビルドする。
 
 */
 
-const Version = "00AE00"
+const Version = "00AF00"
 
 // ユーザーギフトランキングを取得しデータベースに格納する
 //

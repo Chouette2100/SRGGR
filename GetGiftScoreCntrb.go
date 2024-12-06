@@ -9,7 +9,7 @@ import (
 	//	"strconv"
 
 	//	"io"
-	//	"log"
+	"log"
 	//	"os"
 
 	//	"strings"
@@ -89,8 +89,9 @@ func GetGiftScoreCntrb(
 
 		gsc, errt := srapi.ApiCdnGiftRankingContribution(client, giftid, userid)
 		if errt != nil {
-			err = fmt.Errorf("ApiCdnGiftRankingContribution: %w", errt)
-			return
+			//	err = fmt.Errorf("ApiCdnGiftRankingContribution: %w", errt)
+			//	return
+			log.Printf(" ===Error ApiCdnGiftRankingContribu0tion(giftid=%d, userno=%d): error=%s\n", giftid, userno, errt.Error())
 		}
 
 		for _, x := range gsc.RankingList {
