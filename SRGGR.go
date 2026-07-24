@@ -7,24 +7,24 @@ import (
 	"flag"
 	"fmt"
 	"strconv"
-
 	"io"
 	"log"
 	"os"
-
 	"strings"
-	//	"strconv"
 	"time"
-
 	"net/http"
+
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+
 
 	"github.com/go-gorp/gorp"
 
 	//	"github.com/dustin/go-humanize"
 
-	"github.com/Chouette2100/exsrapi"
-	"github.com/Chouette2100/srapi"
-	"github.com/Chouette2100/srdblib"
+	"github.com/Chouette2100/exsrapi/v2"
+	"github.com/Chouette2100/srapi/v2"
+	"github.com/Chouette2100/srdblib/v3"
 )
 
 /*
@@ -35,10 +35,11 @@ import (
 00AD00	「修羅の道ランキング」(Giftid=13）に対応する
 00AE00	貢献ランキング取得の指定を"giftid=-1"での一括指定から、"giftid=-491,-492"の形式にする
 00AF00	ApiCdnGiftRankingContribution()のエラーでは処理を打ち切らない。V2.0.0環境で再ビルドする。
+100000  2026年おまつりライバーランキング緊急対応、DBConfig.ymlのSOPS暗号化を行う
 
 */
 
-const Version = "00AF00"
+const Version = "100000"
 
 // ユーザーギフトランキングを取得しデータベースに格納する
 //
@@ -100,6 +101,9 @@ func GetGiftScore(client *http.Client, dbmap *gorp.DbMap, tnow time.Time, giftid
 	}
 	return nil
 }
+
+var Db *sql.DB
+var Dbmap *gorp.DbMap
 
 // ギフトランキングを読み込みデータベースに書き込む
 //
@@ -165,7 +169,7 @@ func main() {
 
 	//	データベースとの接続をオープンする。
 	var dbconfig *srdblib.DBConfig
-	dbconfig, err = srdblib.OpenDb("DBConfig.yml")
+	Db, dbconfig, err = srdblib.OpenDb("DBConfig.enc.yaml")
 	if err != nil {
 		err = fmt.Errorf("srdblib.OpenDb() returned error. %w", err)
 		log.Printf("%s\n", err.Error())
@@ -174,23 +178,23 @@ func main() {
 	if dbconfig.UseSSH {
 		defer srdblib.Dialer.Close()
 	}
-	defer srdblib.Db.Close()
+	defer Db.Close()
 
 	log.Printf("********** Dbhost=<%s> Dbname = <%s> Dbuser = <%s> Dbpw = <%s>\n",
 		(*dbconfig).DBhost, (*dbconfig).DBname, (*dbconfig).DBuser, (*dbconfig).DBpswd)
 
 	//	gorpの初期設定を行う
 	dial := gorp.MySQLDialect{Engine: "InnoDB", Encoding: "utf8mb4"}
-	srdblib.Dbmap = &gorp.DbMap{Db: srdblib.Db, Dialect: dial, ExpandSliceArgs: true}
+	Dbmap = &gorp.DbMap{Db: Db, Dialect: dial, ExpandSliceArgs: true}
 
-	srdblib.Dbmap.AddTableWithName(srdblib.User{}, "user").SetKeys(false, "Userno")
-	srdblib.Dbmap.AddTableWithName(srdblib.Userhistory{}, "userhistory").SetKeys(false, "Userno", "Ts")
-	srdblib.Dbmap.AddTableWithName(srdblib.GiftScore{}, "giftscore").SetKeys(false, "Giftid", "Ts", "Userno")
-	srdblib.Dbmap.AddTableWithName(srdblib.Viewer{}, "viewer").SetKeys(false, "Viewerid")
-	srdblib.Dbmap.AddTableWithName(srdblib.ViewerHistory{}, "viewerhistory").SetKeys(false, "Viewerid", "Ts")
-	srdblib.Dbmap.AddTableWithName(srdblib.GiftRanking{}, "giftranking").SetKeys(false, "Campaignid","Grid")
-	srdblib.Dbmap.AddTableWithName(srdblib.ViewerGiftScore{}, "viewergiftscore").SetKeys(false, "Giftid", "Ts", "Viewerid")
-	srdblib.Dbmap.AddTableWithName(srdblib.GiftScoreCntrb{}, "giftscorecntrb").SetKeys(false, "Giftid", "Ts", "Userno", "Viewerid")
+	Dbmap.AddTableWithName(srdblib.User{}, "user").SetKeys(false, "Userno")
+	Dbmap.AddTableWithName(srdblib.Userhistory{}, "userhistory").SetKeys(false, "Userno", "Ts")
+	Dbmap.AddTableWithName(srdblib.GiftScore{}, "giftscore").SetKeys(false, "Giftid", "Ts", "Userno")
+	Dbmap.AddTableWithName(srdblib.Viewer{}, "viewer").SetKeys(false, "Viewerid")
+	Dbmap.AddTableWithName(srdblib.ViewerHistory{}, "viewerhistory").SetKeys(false, "Viewerid", "Ts")
+	Dbmap.AddTableWithName(srdblib.GiftRanking{}, "giftranking").SetKeys(false, "Campaignid","Grid")
+	Dbmap.AddTableWithName(srdblib.ViewerGiftScore{}, "viewergiftscore").SetKeys(false, "Giftid", "Ts", "Viewerid")
+	Dbmap.AddTableWithName(srdblib.GiftScoreCntrb{}, "giftscorecntrb").SetKeys(false, "Giftid", "Ts", "Userno", "Viewerid")
 
 	//      cookiejarがセットされたHTTPクライアントを作る
 	client, jar, err := exsrapi.CreateNewClient("anonymous")
@@ -221,19 +225,19 @@ func main() {
 		}
 		tnow := time.Now().Truncate(time.Second)
 		if gid < 0 {
-			err = GetGiftScoreCntrb(client, srdblib.Dbmap, tnow, *campaignid, -gid)
+			err = GetGiftScoreCntrb(client, Dbmap, tnow, *campaignid, -gid)
 			if err != nil {
 				log.Printf("%s\n", err.Error())
 			}
 			continue
-		} else if gid == 206 {
-			err = GetViewerGiftScore(client, srdblib.Dbmap, tnow, *limit)
+		} else if gid < 1000 {
+			err = GetViewerGiftScore(client, Dbmap, tnow, *limit)
 			if err != nil {
 				log.Printf("%s\n", err.Error())
 				continue
 			}
 		} else {
-			err = GetGiftScore(client, srdblib.Dbmap, tnow, gid, *limit)
+			err = GetGiftScore(client, Dbmap, tnow, gid, *limit)
 			if err != nil {
 				log.Printf("%s\n", err.Error())
 				continue

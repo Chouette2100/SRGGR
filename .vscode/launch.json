@@ -1,0 +1,25 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Package",
+            "type": "go",
+           "request": "launch",
+            "mode": "auto",
+            "program": "${fileDirname}",
+            "env": {
+                "SOPS_AGE_KEY_FILE": "/home/chouette/.config/age/key.txt"
+            },
+            "args": [
+                // "-campaignid", "kingofliver2024summer-autumn",
+                "-campaignid", "omatsuri2026",
+                "-limit","100",
+                // "-giftid", "-499", //  486,490,494,495,496,497,498,499,500,501,502,503,504,206
+                "-giftid", "1226,1227,1230,1231,1232,1233,1234,1235,1236,1237,1238,1239,1240,281,235",
+            ],
+        }
+    ]
+}
