@@ -35,18 +35,25 @@ import (
 00AD00	「修羅の道ランキング」(Giftid=13）に対応する
 00AE00	貢献ランキング取得の指定を"giftid=-1"での一括指定から、"giftid=-491,-492"の形式にする
 00AF00	ApiCdnGiftRankingContribution()のエラーでは処理を打ち切らない。V2.0.0環境で再ビルドする。
-100000  2026年おまつりライバーランキング緊急対応、DBConfig.ymlのSOPS暗号化を行う
+100000  2026年おまつりライバーランキング
+100001  wuserを定義するAddTableWithName()を追加する, ファンランキングでgidを指定できるようにする
 
 */
 
-const Version = "100000"
+const Version = "100001"
 
 // ユーザーギフトランキングを取得しデータベースに格納する
 //
 //	ここでいうユーザーとは視聴者のことを意味する
-func GetViewerGiftScore(client *http.Client, dbmap *gorp.DbMap, tnow time.Time, limit int) (err error) {
+func GetViewerGiftScore(
+		client *http.Client,
+		dbmap *gorp.DbMap,
+		tnow time.Time,
+		giftid int,
+		limit int,
+		) (err error) {
 
-	cugr, err := srapi.ApiCdnUserGiftRanking(client, 206, limit)
+	cugr, err := srapi.ApiCdnUserGiftRanking(client, giftid, limit)
 	if err != nil {
 		err = fmt.Errorf("srapi.ApiCdnUserGiftRanking() returned error. %w", err)
 		return err
@@ -57,7 +64,7 @@ func GetViewerGiftScore(client *http.Client, dbmap *gorp.DbMap, tnow time.Time, 
 		err = srdblib.InserIntoViewerGiftScore(
 			client,
 			dbmap,
-			206,
+			giftid,
 			&cugr.RankingList[i],
 			tnow,
 		)
@@ -180,14 +187,15 @@ func main() {
 	}
 	defer Db.Close()
 
-	log.Printf("********** Dbhost=<%s> Dbname = <%s> Dbuser = <%s> Dbpw = <%s>\n",
-		(*dbconfig).DBhost, (*dbconfig).DBname, (*dbconfig).DBuser, (*dbconfig).DBpswd)
+	log.Printf("********** Dbhost=<%s> Dbport = <%s>\n",
+		(*dbconfig).DBhost, (*dbconfig).DBport)
 
 	//	gorpの初期設定を行う
 	dial := gorp.MySQLDialect{Engine: "InnoDB", Encoding: "utf8mb4"}
 	Dbmap = &gorp.DbMap{Db: Db, Dialect: dial, ExpandSliceArgs: true}
 
 	Dbmap.AddTableWithName(srdblib.User{}, "user").SetKeys(false, "Userno")
+	Dbmap.AddTableWithName(srdblib.Wuser{}, "wuser").SetKeys(false, "Userno")
 	Dbmap.AddTableWithName(srdblib.Userhistory{}, "userhistory").SetKeys(false, "Userno", "Ts")
 	Dbmap.AddTableWithName(srdblib.GiftScore{}, "giftscore").SetKeys(false, "Giftid", "Ts", "Userno")
 	Dbmap.AddTableWithName(srdblib.Viewer{}, "viewer").SetKeys(false, "Viewerid")
@@ -231,7 +239,7 @@ func main() {
 			}
 			continue
 		} else if gid < 1000 {
-			err = GetViewerGiftScore(client, Dbmap, tnow, *limit)
+			err = GetViewerGiftScore(client, Dbmap, tnow, gid, *limit)
 			if err != nil {
 				log.Printf("%s\n", err.Error())
 				continue
